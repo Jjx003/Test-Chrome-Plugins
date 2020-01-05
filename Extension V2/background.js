@@ -4,6 +4,37 @@
 
 'use strict';
 
+let domains = new Map()
+//let uaMaps = new Map()
+let localStorage = chrome.storage.local
+let re = /([a-zA-Z0-9]+\.[a-zA-Z.]*\/?)/
+let httpsRe = /^https/
+let portOpen = false
+let currentPort = undefined
+let currentUA = undefined
+
+function checkHTTPS(str) {
+  return httpsRe.test(str)
+}
+
+function getDomain(str) {
+  var matched = str.match(re)[0]
+  var prepend = checkHTTPS(str) ? '🔒' : '❌'
+  return prepend + matched
+}
+
+function tryUpdate(tab, value) {
+  tab = String(tab)
+  let getResult = domains.get(tab)
+  if (getResult == undefined) {
+    let newArr = []
+    newArr.push(value)
+    domains.set(tab, newArr)
+  } else {
+    getResult.push(value)
+  }
+}
+
 chrome.runtime.onInstalled.addListener(function() {
   chrome.declarativeContent.onPageChanged.removeRules(undefined, function() {
     chrome.declarativeContent.onPageChanged.addRules([{
@@ -16,40 +47,91 @@ chrome.runtime.onInstalled.addListener(function() {
   });
 });
 
-/*
-chrome.tabs.onUpdated.addListener( function (tabId, changeInfo, tab) {  
-//chrome.tabs.onActivated.addListener(function(tabInfo) {
-  if (changeInfo.status == 'complete') {
-    //chrome.tabs.query({active:true, currentWindow: true }, function (tabs) {
-      //var tab = tabs[0];
-      console.log("some update")
-      //var tab = chrome.tabs.get(tabInfo.tabId, function(tab){
-        if (typeof (tab) != 'undefined' && typeof (tab.url) != 'undefined') {
-          console.log("there is tab!")
-          console.log(tab)
-          chrome.pageAction.show(tabId);
+chrome.extension.onConnect.addListener(function(port) {
+  if (!portOpen) {
+    let domainSearch = domains.get(port.name)
+    if (domainSearch != undefined) {
+      portOpen = true
 
-          setTimeout(function() {
-            var popup = chrome.extension.getViews({
-              type: "popup",
-              //windowId: tab.windowId
-            })
-            console.log(popup)
-            for (var i = 0; i < popup.length; ++i) {
-              console.log('ree');
-              popup[i].document.getElementById('x').innerHTML = "helloo";
-            }
-          console.log("should be enabled")
-          }, 3000)
+      let messageObject = {}
+      messageObject.command = "u"
+      messageObject.payload = domainSearch 
 
-        } else {
-          console.log('hack')
-        }
-      //})
-  
+      let encoded = JSON.stringify(messageObject)
+      port.postMessage(encoded)
+      currentPort = port
 
-        
-    //});
+      currentPort.onDisconnect.addListener(function(yeet) {
+        currentPort = undefined
+        portOpen = false
+        //domains.delete(port.name)
+      })
+    }
   }
+
+  port.onMessage.addListener(function(msg) {
+       console.log("message recieved" + msg);
+       //port.postMessage("Hi Popup.js");
+       if (msg.charAt(0) == '|') {
+         let ua = msg.substring(1, msg.length)
+         if (ua != "_default") {
+          //console.log("itsworking/"+port.name)
+          //uaMaps.set(port.name, ua)
+          localStorage.set({'currentUA':ua}, ()=>{})
+          currentUA = ua
+         } else {
+           //console.log("back")
+          //uaMaps.delete(port.name)
+          localStorage.remove('currentUA',()=>{})
+          currentUA = undefined
+         }
+       }
+  });
+})
+
+chrome.webRequest.onBeforeSendHeaders.addListener(
+  function (details) {
+    //console.log(details)
+    //let uaString = uaMaps.get(String(details.tabId))
+    let uaString = currentUA
+    let domainName = getDomain(details.url)
+    //console.log(uaString +'is uastring')
+    if (portOpen) {
+      let messageObject = {}
+      messageObject.command = "a"
+      messageObject.payload = domainName
+      let encoded = JSON.stringify(messageObject)
+      tryUpdate(details.tabId, domainName) 
+      currentPort.postMessage(encoded)
+    } else {
+      tryUpdate(details.tabId, domainName) 
+    }
+    if (uaString != undefined) {
+      for (var i = 0; i < details.requestHeaders.length; ++i) {
+        if (details.requestHeaders[i].name == 'User-Agent') {
+          details.requestHeaders[i].value = uaString
+        }
+      }
+      
+      return {requestHeaders:details.requestHeaders}
+    } else {
+      //console.log("No ua")
+    }
+  },
+  {urls: ['<all_urls>'] },
+  ['blocking', 'requestHeaders']
+)
+
+chrome.tabs.onRemoved.addListener(function(tabId, info) {
+  if (domains.get(tabId) != undefined) {
+    domains.delete(tabId)
+  }
+  if (uaMaps.get(tabId) != undefined) {
+    domains.delete(tabId)
+  }
+})
+
+/*
+chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
 })
 */
