@@ -5,7 +5,6 @@
 'use strict';
 
 let domains = new Map()
-//let uaMaps = new Map()
 let localStorage = chrome.storage.local
 let re = /([a-zA-Z0-9]+\.[a-zA-Z.]*\/?)/
 let httpsRe = /^https/
@@ -64,24 +63,17 @@ chrome.extension.onConnect.addListener(function(port) {
       currentPort.onDisconnect.addListener(function(yeet) {
         currentPort = undefined
         portOpen = false
-        //domains.delete(port.name)
       })
     }
   }
 
   port.onMessage.addListener(function(msg) {
-       console.log("message recieved" + msg);
-       //port.postMessage("Hi Popup.js");
        if (msg.charAt(0) == '|') {
          let ua = msg.substring(1, msg.length)
          if (ua != "_default") {
-          //console.log("itsworking/"+port.name)
-          //uaMaps.set(port.name, ua)
           localStorage.set({'currentUA':ua}, ()=>{})
           currentUA = ua
          } else {
-           //console.log("back")
-          //uaMaps.delete(port.name)
           localStorage.remove('currentUA',()=>{})
           currentUA = undefined
          }
@@ -91,11 +83,8 @@ chrome.extension.onConnect.addListener(function(port) {
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
   function (details) {
-    //console.log(details)
-    //let uaString = uaMaps.get(String(details.tabId))
     let uaString = currentUA
     let domainName = getDomain(details.url)
-    //console.log(uaString +'is uastring')
     if (portOpen) {
       let messageObject = {}
       messageObject.command = "a"
@@ -112,10 +101,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
           details.requestHeaders[i].value = uaString
         }
       }
-      
       return {requestHeaders:details.requestHeaders}
-    } else {
-      //console.log("No ua")
     }
   },
   {urls: ['<all_urls>'] },

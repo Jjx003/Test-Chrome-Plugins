@@ -23,10 +23,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
     name: String(currentTab.id)
   })
   
-  port.postMessage("Hi BackGround");
-  
   port.onMessage.addListener(function (msg) {
-    port.postMessage("message recieved here" + msg);
     var test = JSON.parse(msg)
     if (test && test.command) {
       var cmd = test.command
@@ -42,10 +39,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
 
   localStorage.get("selectionIndex", function(result) {
     if (result != undefined && result.selectionIndex != undefined) {
-      port.postMessage("Nasasdasd" + result.selectedIndex)
       selectionForm.selectedIndex = result.selectionIndex
-    } else {
-      //port.postMessage(String(result)+"was the result")
     }
   })
 
@@ -55,10 +49,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
       let index = selectionForm.selectedIndex
       localStorage.set({"selectionIndex" : index}, ()=>{})
       port.postMessage("|"+ua)
-    } else {
-      //localStorage.remove("selectionIndex")
-      //port.postMessage("nani")
-    }
+    } 
   }
   selectionForm.onchange = selectionChanged
 })
